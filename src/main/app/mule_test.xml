@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	
+	<flow name="mule_trainingFlow"  >
+		<http:listener doc:name="Listener"  path="/" config-ref="HTTP_Listener_Configuration" allowedMethods="POST"/>
+		<logger level="INFO" doc:name="Logger"  />
+		<dw:transform-message doc:name="Transform Message" metadata:id="e4c59a58-1b5d-473b-9a76-912f3d1fbb7f">
+			<dw:input-payload mimeType="application/json"/>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+	Name: payload.Name,
+	BillingStreet: payload.BillingStreet,
+	BillingCity: payload.BillingCity,
+	BillingState: payload.BillingState,
+	BillingPostalCode: payload.BillingPostalCode,
+	BillingCountry: payload.BillingCountry
+}]]]></dw:set-payload>
+		</dw:transform-message>
+		<sfdc:create config-ref="Salesforce__Basic_Authentication" type="Account" doc:name="Salesforce">
+			<sfdc:objects ref="#[payload]"/>
+		</sfdc:create>
+		<set-payload value="${mule.security.key}
+" doc:name="Set Payload"/>
+	</flow>
+
+</mule>
