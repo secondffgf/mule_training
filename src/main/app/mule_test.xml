@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+	
+	
+	<flow name="createAccount"  >
+		<http:listener config-ref="HTTP_Listener_Configuration" path="/" allowedMethods="POST" doc:name="Listener"/>
+		<logger level="INFO" doc:name="Logger"  />
+		<dw:transform-message doc:name="Transform Message" metadata:id="e4c59a58-1b5d-473b-9a76-912f3d1fbb7f">
+			<dw:input-payload mimeType="application/json" doc:sample="sample_data\list_json.json"/>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	Name: payload01.Name,
+	BillingStreet: payload01.BillingStreet,
+	BillingCity: payload01.BillingCity,
+	BillingState: payload01.BillingState,
+	BillingPostalCode: payload01.BillingPostalCode,
+	BillingCountry: payload01.BillingCountry
+})
+]]></dw:set-payload>
+		</dw:transform-message>
+		<sfdc:create config-ref="Salesforce__Basic_Authentication" type="Account" doc:name="Salesforce" >
+			<sfdc:objects ref="#[payload]"/>
+
+
+		</sfdc:create>
+
+	</flow>
+	<flow name="mule_testFlow">
+		<http:listener config-ref="HTTP_Listener_Configuration" path="/qwe" allowedMethods="GET" doc:name="HTTP"/>
+		<db:select config-ref="Generic_Database_Configuration" doc:name="Database">
+			<db:parameterized-query><![CDATA[SELECT
+	Brand_Name,
+	Container_Size_in_Liter,
+	Container_Type,
+	Pack_Size,
+	SKU_ExternalId,
+	SKU_Name,
+	SKU_SalesOrg,
+	SKUType__c,
+	SubBrand_Name,
+	Valid_From,
+	Valid_Thru
+FROM slfcint]]></db:parameterized-query>
+		</db:select>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	SKU_ExternalId__c: payload01.SKU_ExternalId as :string,
+	Brand_Name__c: payload01.Brand_Name as :string,
+	SKUType_c__c: payload01.SKUType__c as :string,
+	Container_Size_in_Liter__c: payload01.Container_Size_in_Liter as :number,
+	Pack_Size__c: payload01.Pack_Size as :number,
+	Container_Type__c: payload01.Container_Type as :string,
+	SKU_Name__c: payload01.SKU_Name as :string,
+	Valid_From__c: payload01.Valid_From as :date,
+	Valid_Thru__c: payload01.Valid_Thru as :date,
+	SKU_SalesOrg__c: payload01.SKU_SalesOrg as :string,
+	SubBrand_Name__c: payload01.SubBrand_Name as :string,
+	result_date__c: payload01.Valid_Thru as :date - |P14D|
+})]]></dw:set-payload>
+		</dw:transform-message>
+		<foreach batchSize="50" doc:name="For Each">
+			<logger message="#[payload]" level="INFO" doc:name="Logger"/>
+			<sfdc:create-bulk config-ref="Salesforce__Basic_Authentication" type="slfctestO__c" doc:name="Salesforce">
+				<sfdc:objects ref="#[payload]"/>
+			</sfdc:create-bulk>
+		</foreach>
+	</flow>
+	<flow name="fromSLFCtoMSSQL">
+		<http:listener config-ref="HTTP_Listener_Configuration" path="/get" allowedMethods="GET" doc:name="Listener"/>
+		<sfdc:query config-ref="Salesforce__Basic_Authentication" query="dsql:SELECT AccountNumber,AccountSource,Active__c,AnnualRevenue,BillingCity,BillingCountry,BillingGeocodeAccuracy,BillingLatitude,BillingLongitude,BillingPostalCode,BillingState,BillingStreet,CleanStatus,CreatedById,CreatedDate,CustomerPriority__c,DandbCompanyId,Description,DunsNumber,Fax,Id,Industry,IsDeleted,Jigsaw,JigsawCompanyId,LastActivityDate,LastModifiedById,LastModifiedDate,LastReferencedDate,LastViewedDate,MasterRecordId,NaicsCode,NaicsDesc,Name,NumberOfEmployees,NumberofLocations__c,OwnerId,Ownership,ParentId,Phone,PhotoUrl,Rating,SLAExpirationDate__c,SLASerialNumber__c,SLA__c,ShippingCity,ShippingCountry,ShippingGeocodeAccuracy,ShippingLatitude,ShippingLongitude,ShippingPostalCode,ShippingState,ShippingStreet,Sic,SicDesc,Site,SystemModstamp,TickerSymbol,Tradestyle,Type,UpsellOpportunity__c,Website,YearStarted FROM Account" doc:name="Salesforce"/>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:input-payload doc:sample="sample_data\list_Account.dwl"/>
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	AccountNumber: payload01.AccountNumber default null,
+	AccountSource: payload01.AccountSource default null,
+	AnnualRevenue: payload01.AnnualRevenue default null,
+	Name: payload01.Name default null,
+	NumberOfEmployees: payload01.NumberOfEmployees default null,
+	Ownership: payload01.Ownership default null,
+	Phone: payload01.Phone default null,
+	Rating: payload01.Rating default null,
+	ShippingCity: payload01.ShippingCity default null,
+	ShippingCountry: payload01.ShippingCountry default null,
+	ShippingPostalCode: payload01.ShippingPostalCode default null,
+	ShippingState: payload01.ShippingState default null,
+	ShippingStreet: payload01.ShippingStreet default null,
+	Sic: payload01.Sic default null,
+	SicDesc: payload01.SicDesc default null,
+	Site: payload01.Site default null,
+	TickerSymbol: payload01.TickerSymbol default null,
+	Type: payload01.Type default null,
+	Website: payload01.Website default null,
+	BillingStreet: payload01.BillingStreet default null,
+	Description: payload01.Description default null,
+	Fax: payload01.Fax default null,
+	Industry: payload01.Industry default null,
+	BillingCity: payload01.BillingCity default null,
+	BillingState: payload01.BillingState default null,
+	BillingPostalCode: payload01.BillingPostalCode default null,
+	BillingCountry: payload01.BillingCountry default null
+})]]></dw:set-payload>
+		</dw:transform-message>
+		<foreach doc:name="For Each">
+			<db:insert config-ref="Generic_Database_Configuration" doc:name="Database">
+				<db:parameterized-query><![CDATA[INSERT INTO Account (
+	AccountNumber,
+	AccountSource,
+	AnnualRevenue,
+	BillingCity,
+	BillingCountry,
+	BillingPostalCode,
+	BillingState,
+	BillingStreet,
+	Description,
+	Fax,
+	Industry,
+	Name,
+	NumberOfEmployees,
+	Ownership,
+	Phone,
+	Rating,
+	ShippingCity,
+	ShippingCountry,
+	ShippingPostalCode,
+	ShippingState,
+	ShippingStreet,
+	Sic,
+	SicDesc,
+	Site,
+	TickerSymbol,
+	Type,
+	Website
+) VALUES (
+	#[payload.AccountNumber],
+	#[payload.AccountSource],
+	#[payload.AnnualRevenue],
+	#[payload.BillingCity],
+	#[payload.BillingCountry],
+	#[payload.BillingPostalCode],
+	#[payload.BillingState],
+	#[payload.BillingStreet],
+	#[payload.Description],
+	#[payload.Fax],
+	#[payload.Industry],
+	#[payload.Name],
+	#[payload.NumberOfEmployees],
+	#[payload.Ownership],
+	#[payload.Phone],
+	#[payload.Rating],
+	#[payload.ShippingCity],
+	#[payload.ShippingCountry],
+	#[payload.ShippingPostalCode],
+	#[payload.ShippingState],
+	#[payload.ShippingStreet],
+	#[payload.Sic],
+	#[payload.SicDesc],
+	#[payload.Site],
+	#[payload.TickerSymbol],
+	#[payload.Type],
+	#[payload.Website]
+)]]></db:parameterized-query>
+			</db:insert>
+			<logger level="INFO" doc:name="Logger"/>
+
+		</foreach>
+		<dw:transform-message doc:name="Transform Message">
+			<dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload]]></dw:set-payload>
+		</dw:transform-message>
+
+
+	</flow>
+
+
+</mule>
