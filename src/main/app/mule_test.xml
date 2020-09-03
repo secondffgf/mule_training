@@ -45,7 +45,7 @@ payload map ((payload01 , indexOfPayload01) -> {
 		</sfdc:create>
 
 	</flow>
-	<flow name="mule_testFlow">
+	<flow name="fromDBtoSFLwithdate">
 		<http:listener config-ref="HTTP_Listener_Configuration" path="/qwe" allowedMethods="GET" doc:name="HTTP"/>
 		<db:select config-ref="Generic_Database_Configuration" doc:name="Database">
 			<db:parameterized-query><![CDATA[SELECT
